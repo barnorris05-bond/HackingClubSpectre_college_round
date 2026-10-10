@@ -1,0 +1,56 @@
+:root {
+  /* Surface colors */
+  --bg-notch-idle: rgba(23, 23, 25, 0.78);
+  --bg-notch-active: rgba(20, 20, 23, 0.88);
+  --bg-notch-expanded: rgba(16, 16, 18, 0.92);
+  --bg-emergency: rgba(113, 45, 42, 0.92);
+
+  /* Borders & Highlights */
+  --border-subtle: rgba(255, 253, 249, 0.12);
+  --border-highlight: rgba(255, 253, 249, 0.28);
+  --border-glow: rgba(255, 253, 249, 0.08);
+  --border-blue: rgba(105, 167, 255, 0.45);
+  --border-emergency: rgba(198, 93, 70, 0.6);
+
+  /* Text & Warm Identity */
+  --text-primary: #FFFDF9;
+  --text-secondary: #E8D8C4;
+  --text-muted: rgba(243, 235, 221, 0.65);
+  --text-terracotta: #C65D46;
+  --text-red: #E0584F;
+
+  /* Accent & Lighting */
+  --accent-warm-ivory: #FAF7F2;
+  --accent-cream: #F3EBDD;
+  --accent-terracotta: #C65D46;
+  --accent-blue: #69A7FF;
+  --accent-blue-glow: rgba(105, 167, 255, 0.35);
+  --accent-red-glow: rgba(185, 56, 50, 0.4);
+
+  /* Liquid Glass Specular & Shadows */
+  --specular-gradient: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.22) 0%,
+    rgba(255, 255, 255, 0.05) 30%,
+    rgba(255, 255, 255, 0.0) 60%,
+    rgba(255, 255, 255, 0.08) 100%
+  );
+  --surface-blur: blur(24px) saturate(190%);
+  --shadow-island: 0 16px 36px -8px rgba(0, 0, 0, 0.55),
+                   0 6px 14px -3px rgba(0, 0, 0, 0.4),
+                   0 0 0 1px rgba(255, 255, 255, 0.08) inset;
+  --shadow-expanded: 0 24px 52px -12px rgba(0, 0, 0, 0.7),
+                     0 10px 24px -6px rgba(0, 0, 0, 0.5),
+                     0 0 0 1px rgba(255, 255, 255, 0.12) inset;
+
+  /* Radii */
+  --radius-pill: 26px;
+  --radius-expanded: 28px;
+  --radius-inner: 16px;
+
+  /* Spring-like cubic beziers */
+  --ease-elastic: cubic-bezier(0.2, 0.85, 0.3, 1.15);
+  --ease-smooth: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --anim-duration-wake: 600ms;
+}
