@@ -1,0 +1,8 @@
+# Install only the capabilities you have verified and intend to use.
+opencv-python>=4.10
+mediapipe>=0.10.30
+vosk>=0.3.45
+faster-whisper>=1.1
+playwright>=1.55
+pyautogui>=0.9.54
+
