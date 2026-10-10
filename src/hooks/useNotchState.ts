@@ -46,6 +46,8 @@ export function useNotchState() {
       setState('dictation_demo');
     } else if (newMode === 'context') {
       setState('context_selecting');
+    } else if (newMode === 'vision') {
+      setState('listening');
     }
   }, [clearTimer]);
 

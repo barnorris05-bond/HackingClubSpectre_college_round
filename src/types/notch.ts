@@ -11,7 +11,7 @@ export type NotchState =
   | 'permission_required'
   | 'error';
 
-export type ContextMode = 'voice' | 'dictation' | 'context';
+export type ContextMode = 'voice' | 'dictation' | 'context' | 'vision';
 
 export interface DisplayBounds {
   x: number;
@@ -42,6 +42,14 @@ export interface NotchDiagnostics {
   reducedMotion: boolean;
   activeMode: ContextMode;
   audioReactive: boolean;
+  backendConnected: boolean;
+  backendPaused: boolean;
+  backendEmergencyStopped: boolean;
+  backendVoiceStatus: string;
+  sessionId?: string | null;
+  cameraStatus?: string;
+  headPoseConfidence?: number | null;
+  wakeWordStatus?: string;
 }
 
 export interface ElectronAPI {
@@ -49,9 +57,12 @@ export interface ElectronAPI {
   setIgnoreMouseEvents: (ignore: boolean, forward?: boolean) => Promise<void>;
   enterContextSelectionMode: () => Promise<void>;
   exitContextSelectionMode: () => Promise<void>;
+  enterWakeOverlay: () => Promise<void>;
+  exitWakeOverlay: () => Promise<void>;
   closeApp: () => Promise<void>;
   onStateTrigger: (callback: (action: string) => void) => () => void;
   getDisplayBounds: () => Promise<DisplayBounds>;
+  openUrl: (url: string) => Promise<{ success: boolean; url?: string; error?: string }>;
 }
 
 declare global {

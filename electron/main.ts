@@ -1,4 +1,4 @@
-import { app, BrowserWindow, screen, ipcMain, globalShortcut } from 'electron';
+import { app, BrowserWindow, screen, ipcMain, globalShortcut, shell } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -122,6 +122,23 @@ ipcMain.handle('notch:exit-context-selection', () => {
   mainWindow.setBounds(normalBounds, true);
 });
 
+ipcMain.handle('notch:enter-wake-overlay', () => {
+  if (!mainWindow) return;
+  isContextSelecting = true;
+  const primaryDisplay = screen.getPrimaryDisplay();
+  mainWindow.setBounds(primaryDisplay.bounds, false);
+  // Allow mouse events to pass through so the user can interact with their desktop during wake
+  mainWindow.setIgnoreMouseEvents(true, { forward: true });
+});
+
+ipcMain.handle('notch:exit-wake-overlay', () => {
+  if (!mainWindow) return;
+  mainWindow.setIgnoreMouseEvents(false);
+  isContextSelecting = false;
+  const normalBounds = calculateNotchBounds(NOTCH_WIDTH, NOTCH_HEIGHT);
+  mainWindow.setBounds(normalBounds, true);
+});
+
 ipcMain.handle('notch:close', () => {
   app.quit();
 });
@@ -129,6 +146,22 @@ ipcMain.handle('notch:close', () => {
 ipcMain.handle('notch:get-display-bounds', () => {
   const primaryDisplay = screen.getPrimaryDisplay();
   return primaryDisplay.bounds;
+});
+
+ipcMain.handle('notch:open-url', async (_event, url: string) => {
+  // Validate URL to prevent security issues
+  try {
+    const parsedUrl = new URL(url);
+    // Only allow http and https protocols
+    if (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') {
+      await shell.openExternal(url);
+      return { success: true, url };
+    } else {
+      return { success: false, error: 'Invalid protocol. Only HTTP and HTTPS are allowed.' };
+    }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Invalid URL' };
+  }
 });
 
 // App Lifecycle

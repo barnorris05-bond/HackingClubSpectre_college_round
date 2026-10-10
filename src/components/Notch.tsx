@@ -6,9 +6,21 @@ interface NotchProps {
   state: NotchState;
   onActivate: () => void;
   reducedMotion: boolean;
+  backendConnected?: boolean;
+  backendPaused?: boolean;
+  cameraActive?: boolean;
+  wakeWordListening?: boolean;
 }
 
-export const Notch: React.FC<NotchProps> = ({ state, onActivate, reducedMotion }) => {
+export const Notch: React.FC<NotchProps> = ({
+  state,
+  onActivate,
+  reducedMotion,
+  backendConnected = false,
+  backendPaused = false,
+  cameraActive = false,
+  wakeWordListening = false,
+}) => {
   const notchRef = useRef<HTMLDivElement | null>(null);
   const [mousePos, setMousePos] = useState({ x: 50, y: 50 });
 
@@ -52,12 +64,24 @@ export const Notch: React.FC<NotchProps> = ({ state, onActivate, reducedMotion }
         <div className="notch-emblem">
           <span className="notch-dot terracotta" />
           <span className="notch-dot cream" />
+          {cameraActive && (
+            <span
+              className="notch-dot camera-dot"
+              title="Camera / Vision Active"
+            />
+          )}
+          <span
+            className={`notch-dot connection-dot ${backendConnected ? 'connected' : 'offline'}`}
+            title={backendConnected ? 'Backend Connected (127.0.0.1:8000)' : 'Backend Offline / Standalone'}
+          />
         </div>
 
         {/* Ready indicator */}
         <div className="notch-status-text">
           <span className="notch-brand">Handsfree</span>
-          <span className="notch-subtext">Ready</span>
+          <span className={`notch-subtext ${backendPaused ? 'paused-subtext' : ''}`}>
+            {backendPaused ? 'Paused' : 'Ready'}
+          </span>
         </div>
 
         {/* Subtle mic prompt indicator */}

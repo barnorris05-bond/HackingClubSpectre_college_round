@@ -14,6 +14,12 @@ const electronAPI: ElectronAPI = {
   exitContextSelectionMode: () => {
     return ipcRenderer.invoke('notch:exit-context-selection');
   },
+  enterWakeOverlay: () => {
+    return ipcRenderer.invoke('notch:enter-wake-overlay');
+  },
+  exitWakeOverlay: () => {
+    return ipcRenderer.invoke('notch:exit-wake-overlay');
+  },
   closeApp: () => {
     return ipcRenderer.invoke('notch:close');
   },
@@ -28,6 +34,9 @@ const electronAPI: ElectronAPI = {
   },
   getDisplayBounds: () => {
     return ipcRenderer.invoke('notch:get-display-bounds');
+  },
+  openUrl: (url: string) => {
+    return ipcRenderer.invoke('notch:open-url', url);
   },
 };
 

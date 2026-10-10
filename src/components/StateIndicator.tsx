@@ -82,8 +82,46 @@ export const StateIndicator: React.FC<StateIndicatorProps> = ({
               {diagnostics.reducedMotion ? 'Reduced' : 'Full Liquid Dynamics'}
             </span>
           </div>
+          <div className="diagnostic-item">
+            <span className="diag-label">Backend (8000):</span>
+            <span className={`diag-value ${diagnostics.backendConnected ? 'granted' : 'dormant'}`}>
+              {diagnostics.backendConnected ? 'Connected (Live Telemetry)' : 'Offline / Standalone'}
+            </span>
+          </div>
+          {diagnostics.sessionId && (
+            <div className="diagnostic-item">
+              <span className="diag-label">Session ID:</span>
+              <span className="diag-value" style={{ fontSize: '9px' }}>
+                {diagnostics.sessionId.slice(0, 18)}...
+              </span>
+            </div>
+          )}
+          <div className="diagnostic-item">
+            <span className="diag-label">Backend Voice:</span>
+            <span className="diag-value">
+              {diagnostics.backendVoiceStatus}
+            </span>
+          </div>
+          {diagnostics.cameraStatus && (
+            <div className="diagnostic-item">
+              <span className="diag-label">Camera/Vision:</span>
+              <span className={`diag-value ${diagnostics.cameraStatus === 'tracking_active' ? 'granted' : ''}`}>
+                {diagnostics.cameraStatus}
+              </span>
+            </div>
+          )}
+          {diagnostics.wakeWordStatus && (
+            <div className="diagnostic-item">
+              <span className="diag-label">Wake Phrase:</span>
+              <span className={`diag-value ${diagnostics.wakeWordStatus === 'listening' ? 'granted' : ''}`}>
+                {diagnostics.wakeWordStatus}
+              </span>
+            </div>
+          )}
           <div className="diagnostic-note">
-            Prototype telemetry. No external network transmission.
+            {diagnostics.backendConnected
+              ? 'Synchronized with Handsfree-Backend-Lab service.'
+              : 'Standalone prototype mode. Backend offline.'}
           </div>
         </div>
       )}
