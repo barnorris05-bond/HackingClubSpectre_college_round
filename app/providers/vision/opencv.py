@@ -48,7 +48,14 @@ class OpenCVCameraProvider(VisionProvider):
             return VisionSample(False, None)
         x, y, width, height = max(faces, key=lambda face: face[2] * face[3])
         frame_height, frame_width = gray.shape[:2]
-        return VisionSample(True, 0.9, (x + width / 2) / frame_width, (y + height / 2) / frame_height)
+        return VisionSample(
+            True,
+            0.9,
+            (x + width / 2) / frame_width,
+            (y + height / 2) / frame_height,
+            frame_width=frame_width,
+            frame_height=frame_height,
+        )
 
     async def sample(self) -> VisionSample:
         if self._capture is None:

@@ -11,6 +11,7 @@ class SessionManager:
         now = datetime.now(timezone.utc)
         self.telemetry = telemetry
         self.state = SessionState(session_id=str(uuid4()), started_at=now, updated_at=now)
+        self.tracking_reset_generation = 0
 
     def snapshot(self) -> SessionState:
         return self.state.model_copy(deep=True)
@@ -25,6 +26,7 @@ class SessionManager:
 
     async def pause(self) -> SessionState:
         self.state.paused = True
+        self._invalidate_tracking_stability()
         await self._publish(EventType.SESSION_PAUSED, {"reason": "explicit_pause"})
         return self.snapshot()
 
@@ -38,12 +40,14 @@ class SessionManager:
         self.state.emergency_stopped = True
         self.state.paused = True
         self.state.cursor_control_enabled = False
+        self._invalidate_tracking_stability()
         await self._publish(EventType.SESSION_EMERGENCY_STOP, {"latched": True})
         return self.snapshot()
 
     async def recover(self) -> SessionState:
         self.state.emergency_stopped = False
         self.state.paused = False
+        self._invalidate_tracking_stability()
         await self._publish(EventType.SESSION_STATE, {"recovered": True, "state": self.state.model_dump(mode="json")})
         return self.snapshot()
 
@@ -74,5 +78,10 @@ class SessionManager:
 
     async def set_calibrated(self, value: bool) -> None:
         self.state.calibrated = value
+        self._invalidate_tracking_stability()
         await self._publish(EventType.VISION_CALIBRATION, {"status": "complete" if value else "invalid", "calibrated": value})
+
+    def _invalidate_tracking_stability(self) -> None:
+        self.state.target_stable = False
+        self.tracking_reset_generation += 1
 

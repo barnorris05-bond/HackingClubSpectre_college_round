@@ -37,7 +37,13 @@ class Services:
                 vision = OpenCVCameraProvider(settings.camera_index)
             except ImportError:
                 vision = VisionProvider()
-        self.vision = VisionService(vision or VisionProvider(), self.session, self.telemetry)
+        self.vision = VisionService(
+            vision or VisionProvider(),
+            self.session,
+            self.telemetry,
+            stability_radius_px=settings.stability_radius_px,
+            stability_window_ms=settings.stability_window_ms,
+        )
         self.cursor = FakeCursorAdapter()
         self.browser = FakeBrowserAdapter() if settings.browser_provider == "dry-run" else None
         self.browser_ready = False

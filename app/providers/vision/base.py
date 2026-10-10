@@ -7,6 +7,9 @@ class VisionSample:
     confidence: float | None
     x: float | None = None
     y: float | None = None
+    timestamp: float | None = None
+    frame_width: int | None = None
+    frame_height: int | None = None
 
 
 class VisionProvider:
