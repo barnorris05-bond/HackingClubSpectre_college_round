@@ -48,7 +48,7 @@ export interface NotchDiagnostics {
   backendVoiceStatus: string;
   sessionId?: string | null;
   cameraStatus?: string;
-  headPoseConfidence?: number | null;
+  trackingQuality?: number | null;
   wakeWordStatus?: string;
 }
 

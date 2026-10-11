@@ -246,6 +246,11 @@ class ControlState:
                 self.paused = True
                 self.tracking = False
                 self.tracking_reason = "emergency_stop"
+            elif self.tracking_reason == "emergency_stop":
+                # Recovery clears only the stop latch. Its pause remains set,
+                # and tracking reports that authoritative state accurately.
+                self.tracking = False
+                self.tracking_reason = "paused"
             self._touch()
         self._telemetry.emit(
             "safety",

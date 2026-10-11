@@ -103,12 +103,18 @@ test('uses the actual health, status, and voice command routes and request body'
   const originalFetch = globalThis.fetch;
   const calls = [];
   globalThis.fetch = async (input, init) => {
-    calls.push({ url: String(input), body: init?.body ? JSON.parse(String(init.body)) : null });
+    calls.push({ url: String(input), method: init?.method || 'GET', body: init?.body ? JSON.parse(String(init.body)) : null });
     if (String(input).endsWith('/health')) {
       return new Response(JSON.stringify({ status: 'ok', timestamp: '2026-10-11T00:00:00Z' }), { status: 200 });
     }
     if (String(input).endsWith('/api/status')) {
       return new Response(JSON.stringify(statusFixture()), { status: 200 });
+    }
+    if (String(input).endsWith('/api/vision/start')) {
+      return new Response(JSON.stringify({
+        available: true, running: true, fps: 0, inference_ms: 0, model: 'face_landmarker.task',
+        synthetic_source: false, camera: { status: 'starting' }, tracking: { active: false, reason: 'not_started' },
+      }), { status: 200 });
     }
     return new Response(JSON.stringify({
       transcript: 'open example.com', kind: 'navigate', executed: false,
@@ -120,10 +126,12 @@ test('uses the actual health, status, and voice command routes and request body'
   assert.equal((await backendApi.getHealth()).status, 'ok');
   assert.equal((await backendApi.getSession()).lifecycle, 'stopped');
   assert.equal((await backendApi.sendVoiceCommand('open example.com')).status, 'blocked');
+  assert.equal((await backendApi.startVision()).running, true);
   assert.deepEqual(calls.map(({ url }) => new URL(url).pathname), [
-    '/health', '/api/status', '/api/voice/command',
+    '/health', '/api/status', '/api/voice/command', '/api/vision/start',
   ]);
   assert.deepEqual(calls[2].body, { text: 'open example.com' });
+  assert.equal(calls[3].method, 'POST');
 });
 
 test('accepts actual initial history and live telemetry websocket packets', () => {

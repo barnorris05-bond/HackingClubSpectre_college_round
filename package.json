@@ -10,6 +10,7 @@
     "build:renderer": "tsc -b && vite build",
     "build:electron": "esbuild electron/main.ts --platform=node --format=esm --outfile=dist-electron/main.js --bundle --external:electron && esbuild electron/preload.ts --platform=node --format=cjs --outfile=dist-electron/preload.cjs --bundle --external:electron",
     "build": "npm run build:renderer && npm run build:electron",
+    "test:api-adapter": "node --experimental-strip-types --test src/services/backendApi.test.mjs",
     "start": "electron .",
     "electron:dev": "npm run build:electron && electron .",
     "typecheck": "tsc -b"

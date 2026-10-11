@@ -30,6 +30,35 @@ def test_vision_dependencies_are_available(runtime: Runtime) -> None:
     assert runtime.tracker.unavailable_reason is None
 
 
+def test_real_model_load_is_independent_of_working_directory(runtime: Runtime, monkeypatch, tmp_path) -> None:
+    from app.vision.tracker import MODEL_PATH
+
+    monkeypatch.chdir(tmp_path)
+    landmarker = runtime.tracker._landmarker_instance()
+    try:
+        assert MODEL_PATH.is_absolute()
+        assert MODEL_PATH.stat().st_size > 1_000_000
+        assert landmarker is not None
+    finally:
+        landmarker.close()
+        runtime.tracker._landmarker = None
+
+
+def test_camera_read_failure_clears_tracking_immediately(runtime: Runtime) -> None:
+    class FailedCapture:
+        def read(self):
+            return False, None
+
+        def release(self):
+            pass
+
+    runtime.tracker._capture = FailedCapture()
+    runtime.state.set_tracking(True, "ok", quality=0.9, faces=1)
+    assert runtime.tracker._read_frame() is None
+    assert runtime.state.tracking is False
+    assert runtime.state.tracking_reason == "camera_lost"
+
+
 def test_worker_starts_and_reports_status(runtime: Runtime) -> None:
     runtime.tracker.start()
     try:

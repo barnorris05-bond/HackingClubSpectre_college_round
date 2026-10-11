@@ -192,9 +192,11 @@ def inject_pointer(
 # --------------------------------------------------------------------- #
 @router.get("/api/vision/status", tags=["vision"])
 def vision_status(runtime: Runtime = Depends(get_runtime)) -> dict[str, Any]:
+    state = runtime.state.snapshot()
     return {
         **runtime.tracker.status(),
-        "camera": runtime.state.snapshot()["camera"],
+        "camera": state["camera"],
+        "tracking": state["tracking"],
         "calibration": runtime.tracker.calibration_status(),
     }
 
@@ -213,14 +215,19 @@ def vision_start(runtime: Runtime = Depends(get_runtime)) -> dict[str, Any]:
                 ),
             },
         )
-    runtime.tracker.start()
-    return runtime.tracker.status()
+    status = runtime.tracker.start()
+    if status.get("error_code") == "model_load_failed":
+        raise HTTPException(
+            status_code=503,
+            detail={"reason": status["error_code"], "detail": status.get("error")},
+        )
+    return vision_status(runtime)
 
 
 @router.post("/api/vision/stop", tags=["vision"])
 def vision_stop(runtime: Runtime = Depends(get_runtime)) -> dict[str, Any]:
     runtime.tracker.stop()
-    return runtime.tracker.status()
+    return vision_status(runtime)
 
 
 @router.post("/api/vision/calibrate", tags=["vision"])

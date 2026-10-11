@@ -68,12 +68,12 @@ export const App: React.FC = () => {
     }
   }, []);
 
-  // Feature 2: Automatic Head Tracking / Camera module
+  // Feature 2: Backend-owned camera and face-tracking service
   const {
     status: cameraStatus,
-    headPose,
     calibrated,
     errorMessage: cameraError,
+    previewUrl: cameraPreviewUrl,
     videoRef,
     startCamera,
     stopCamera,
@@ -102,12 +102,17 @@ export const App: React.FC = () => {
     stopListening: stopVoiceListening,
   } = useVoiceCommands(handleWakeWordDetected);
 
-  // Synchronize backend emergency stop & pause states with notch visual states
+  // Backend safety state is authoritative; clearing emergency stop stays paused.
   useEffect(() => {
-    if (session?.emergency_stopped && state !== 'emergency_stop') {
+    if (!session) return;
+    if (session.emergency_stopped && state !== 'emergency_stop') {
       setExplicitState('emergency_stop');
+    } else if (!session.emergency_stopped && session.paused && state !== 'paused') {
+      setExplicitState('paused');
+    } else if (!session.paused && state === 'paused') {
+      resetToIdle();
     }
-  }, [session?.emergency_stopped, state, setExplicitState]);
+  }, [session?.emergency_stopped, session?.paused, state, setExplicitState, resetToIdle]);
 
   // Handle resizing the native Electron BrowserWindow based on UI state
   useEffect(() => {
@@ -157,11 +162,16 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleRecover = () => {
-    if (connectionStatus === 'connected') {
-      recover().catch(() => {});
+  const handleRecover = async () => {
+    if (connectionStatus !== 'connected') return;
+    if (!session?.emergency_stopped) {
+      resetToIdle();
+      return;
     }
-    resetToIdle();
+    const recovered = await recover();
+    if (recovered && !recovered.emergency_stopped && recovered.paused && !recovered.cursor_control_enabled) {
+      setExplicitState('paused');
+    }
   };
 
   const isExpanded = state !== 'idle' && state !== 'context_selecting' && !isWakingUp;
@@ -179,7 +189,7 @@ export const App: React.FC = () => {
     backendVoiceStatus: session?.voice_status || 'unavailable',
     sessionId: session?.session_id,
     cameraStatus,
-    headPoseConfidence: headPose?.confidence,
+    trackingQuality: session?.tracking_confidence,
     wakeWordStatus,
   };
 
@@ -240,11 +250,10 @@ export const App: React.FC = () => {
                 onExecuteBackendCommand={(transcript) => executeCommand(transcript, true)}
                 onPauseBackend={pause}
                 onResumeBackend={resume}
-                onRecoverBackend={handleRecover}
                 cameraStatus={cameraStatus}
-                headPose={headPose}
                 calibrated={calibrated}
                 cameraError={cameraError}
+                cameraPreviewUrl={cameraPreviewUrl}
                 videoRef={videoRef}
                 onStartCamera={startCamera}
                 onStopCamera={stopCamera}

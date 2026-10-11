@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 
 import type { CommandResult, SessionState } from '../services/backendApi';
-import type { CameraStatus, HeadPoseData } from '../hooks/useHeadTracking';
+import type { CameraStatus } from '../hooks/useHeadTracking';
 import type { WakeWordStatus } from '../hooks/useWakeWord';
 import type { VoiceCommandStatus, VoiceCommandResult } from '../hooks/useVoiceCommands';
 import { Camera, VideoOff, RefreshCw } from 'lucide-react';
@@ -43,13 +43,12 @@ interface ExpandedPanelProps {
   onExecuteBackendCommand?: (transcript: string) => void;
   onPauseBackend?: () => void;
   onResumeBackend?: () => void;
-  onRecoverBackend?: () => void;
   // Vision & Camera props
   cameraStatus: CameraStatus;
-  headPose: HeadPoseData | null;
   calibrated: boolean;
   cameraError: string | null;
-  videoRef: React.RefObject<HTMLVideoElement | null>;
+  cameraPreviewUrl: string | null;
+  videoRef: React.RefObject<HTMLImageElement | null>;
   onStartCamera: () => void;
   onStopCamera: () => void;
   onCalibrateCamera: () => void;
@@ -86,11 +85,10 @@ export const ExpandedPanel: React.FC<ExpandedPanelProps> = ({
   onExecuteBackendCommand,
   onPauseBackend,
   onResumeBackend,
-  onRecoverBackend,
   cameraStatus,
-  headPose,
   calibrated,
   cameraError,
+  cameraPreviewUrl,
   videoRef,
   onStartCamera,
   onStopCamera,
@@ -154,10 +152,7 @@ export const ExpandedPanel: React.FC<ExpandedPanelProps> = ({
           </p>
           <button
             className="disarm-btn"
-            onClick={() => {
-              if (onRecoverBackend) onRecoverBackend();
-              onReset();
-            }}
+            onClick={onReset}
           >
             Disarm &amp; Recover Session
           </button>
@@ -406,12 +401,11 @@ export const ExpandedPanel: React.FC<ExpandedPanelProps> = ({
         <div className="vision-mode-view">
           <div className="vision-preview-row">
             <div className="webcam-feed-container">
-              <video
+              <img
                 ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className={`webcam-video ${cameraStatus === 'inactive' ? 'hidden' : ''}`}
+                src={cameraPreviewUrl ?? undefined}
+                className={`webcam-video ${cameraPreviewUrl ? '' : 'hidden'}`}
+                alt="Backend camera preview"
               />
               {cameraStatus === 'inactive' && (
                 <div className="webcam-inactive-placeholder">
@@ -423,6 +417,12 @@ export const ExpandedPanel: React.FC<ExpandedPanelProps> = ({
                 <div className="webcam-inactive-placeholder">
                   <RefreshCw className="w-6 h-6 text-blue-400 animate-spin" />
                   <span>Starting Camera...</span>
+                </div>
+              )}
+              {(cameraStatus === 'camera_error' || cameraStatus === 'model_error') && (
+                <div className="webcam-inactive-placeholder">
+                  <VideoOff className="w-6 h-6 text-stone-400" />
+                  <span>Vision unavailable</span>
                 </div>
               )}
             </div>
@@ -453,26 +453,12 @@ export const ExpandedPanel: React.FC<ExpandedPanelProps> = ({
                 </span>
               </div>
 
-              {headPose && (
-                <div className="head-pose-box">
-                  <div className="pose-metric">
-                    <span>Pitch:</span> <b>{headPose.pitch}&deg;</b>
-                  </div>
-                  <div className="pose-metric">
-                    <span>Yaw:</span> <b>{headPose.yaw}&deg;</b>
-                  </div>
-                  <div className="pose-metric">
-                    <span>Conf:</span> <b>{Math.round(headPose.confidence * 100)}%</b>
-                  </div>
-                </div>
-              )}
-
               {cameraError && (
                 <p className="vision-error-text">{cameraError}</p>
               )}
 
               <div className="vision-actions">
-                {cameraStatus === 'inactive' || cameraStatus === 'permission_denied' ? (
+                {cameraStatus === 'inactive' || cameraStatus === 'permission_denied' || cameraStatus === 'camera_error' || cameraStatus === 'model_error' ? (
                   <button className="secondary-action-btn" onClick={onStartCamera}>
                     <Camera className="w-3.5 h-3.5" />
                     <span>Start Camera</span>

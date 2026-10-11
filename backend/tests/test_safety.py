@@ -25,6 +25,12 @@ from app.control.safety import (
 from app.config import Settings
 
 
+def test_control_starts_paused_with_os_cursor_disarmed(runtime: Runtime) -> None:
+    assert runtime.state.paused is True
+    assert runtime.state.emergency_stop is False
+    assert runtime.state.cursor_control_enabled is False
+
+
 def arm_ready_pointer(runtime: Runtime, nx: float = 0.5, ny: float = 0.5) -> None:
     """Bring the system to the state where a click *should* be allowed."""
     runtime.state.pointer_injection_enabled = True

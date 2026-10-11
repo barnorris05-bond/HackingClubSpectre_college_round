@@ -82,12 +82,48 @@ def test_clearing_emergency_stop_does_not_resume_browser_actions(client: TestCli
     client.post("/api/control/emergency-stop", json={"active": True})
     cleared = client.post("/api/control/emergency-stop", json={"active": False}).json()
     assert cleared["paused"] is True
+    assert cleared["cursor_control_enabled"] is False
+    assert cleared["tracking"]["reason"] == "paused"
 
     result = client.post(
         "/api/browser/action", json={"action": "goto", "url": "https://example.com"}
     ).json()
     assert result["ok"] is False
     assert result["reason"] == "paused"
+
+
+def test_vision_start_reports_model_initialization_failure(client: TestClient, monkeypatch) -> None:
+    runtime = app.state.runtime
+
+    def fail_model_load():
+        raise RuntimeError("model graph rejected asset")
+
+    monkeypatch.setattr(runtime.tracker, "_landmarker_instance", fail_model_load)
+    response = client.post("/api/vision/start")
+    assert response.status_code == 503
+    detail = response.json()["detail"]
+    assert detail["reason"] == "model_load_failed"
+    assert "model graph rejected asset" in detail["detail"]
+    assert runtime.tracker.running is False
+
+
+def test_vision_start_api_starts_backend_worker_with_safety_disarmed(client: TestClient, monkeypatch) -> None:
+    runtime = app.state.runtime
+    # Keep the endpoint lifecycle test independent of physical camera access.
+    monkeypatch.setattr(runtime.tracker, "_run", lambda: runtime.tracker._stop_event.wait(1))
+    response = client.post("/api/vision/start")
+    try:
+        assert response.status_code == 200
+        assert response.json()["running"] is True
+        assert response.json()["camera"]["status"] in {"starting", "running"}
+        assert "tracking" in response.json()
+        assert runtime.tracker.running is True
+        assert runtime.state.cursor_control_enabled is False
+    finally:
+        stopped = client.post("/api/vision/stop")
+    assert stopped.status_code == 200
+    assert stopped.json()["running"] is False
+    assert runtime.state.cursor_control_enabled is False
 
 
 def test_cursor_cannot_be_armed_during_emergency_stop(client: TestClient) -> None:

@@ -73,6 +73,21 @@ export interface BackendStatus {
   dictation?: unknown;
 }
 
+export interface VisionStatusResponse {
+  available: boolean;
+  unavailable_reason?: string | null;
+  running: boolean;
+  fps: number;
+  inference_ms: number;
+  model: string;
+  synthetic_source: boolean;
+  error?: string | null;
+  error_code?: string | null;
+  camera?: { status?: string; detail?: string | null; available?: boolean };
+  tracking?: { active?: boolean; reason?: string; quality?: number; faces?: number };
+  calibration?: { state?: string; calibrated?: boolean; detail?: string | null };
+}
+
 const asRecord = (value: unknown): Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -197,6 +212,8 @@ export const getWsUrl = (): string => {
   return root.toString();
 };
 
+export const getVisionStreamUrl = (): string => `${getApiRoot()}/api/vision/stream`;
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 4000);
@@ -208,7 +225,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     });
     if (!res.ok) {
       const body = await res.json().catch(() => null) as { detail?: unknown; error?: { message?: string } } | null;
-      throw new Error(body?.error?.message || (typeof body?.detail === 'string' ? body.detail : `HTTP ${res.status}: ${res.statusText}`));
+      const detail = asRecord(body?.detail);
+      const detailMessage = typeof body?.detail === 'string' ? body.detail : text(detail.detail) || text(detail.reason);
+      throw new Error(body?.error?.message || detailMessage || `HTTP ${res.status}: ${res.statusText}`);
     }
     return await res.json() as T;
   } catch (err: unknown) {
@@ -232,6 +251,10 @@ export const backendApi = {
   resumeSession: () => controlRequest('/api/control/pause', { paused: false }),
   emergencyStop: (active = true) => controlRequest('/api/control/emergency-stop', { active }),
   recoverSession: () => controlRequest('/api/control/emergency-stop', { active: false }),
+  getVisionStatus: () => request<VisionStatusResponse>('/api/vision/status'),
+  startVision: () => request<VisionStatusResponse>('/api/vision/start', { method: 'POST' }),
+  stopVision: () => request<VisionStatusResponse>('/api/vision/stop', { method: 'POST' }),
+  calibrateVision: () => request<Record<string, unknown>>('/api/vision/calibrate', { method: 'POST' }),
   sendVoiceCommand: async (transcript: string): Promise<CommandResult> =>
     mapCommandResult(await request<unknown>('/api/voice/command', {
       method: 'POST', body: JSON.stringify({ text: transcript }),

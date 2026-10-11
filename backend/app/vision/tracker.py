@@ -22,6 +22,7 @@ Design notes that matter for correctness:
 from __future__ import annotations
 
 import math
+import logging
 import threading
 import time
 from collections import deque
@@ -36,6 +37,7 @@ from app.vision.cursor import CursorController
 from app.vision.filters import OneEuroFilter2D, radial_dead_zone
 
 MODEL_PATH = Path(__file__).resolve().parent / "models" / "face_landmarker.task"
+logger = logging.getLogger(__name__)
 
 # FaceLandmarker landmark indices (468-point canonical face mesh).
 NOSE_TIP = 1
@@ -126,6 +128,8 @@ class FaceTracker:
         self._stop_event = threading.Event()
         self._lock = threading.RLock()
         self._landmarker: Any = None
+        self._startup_error: str | None = None
+        self._startup_error_code: str | None = None
         self._cv2: Any = None
         self._mp: Any = None
         self._capture: Any = None
@@ -204,6 +208,30 @@ class FaceTracker:
                     data={"detail": self._unavailable_reason},
                 )
                 return self.status()
+            self._startup_error = None
+            self._startup_error_code = None
+            try:
+                # Validate the actual configured model before reporting a
+                # running worker. File presence and importability are not
+                # enough to prove MediaPipe can construct this task.
+                self._landmarker_instance()
+            except Exception as exc:
+                self._startup_error_code = "model_load_failed"
+                self._startup_error = (
+                    f"Could not load MediaPipe model at {MODEL_PATH}: "
+                    f"{type(exc).__name__}: {exc}"
+                )
+                logger.exception("Failed to initialize MediaPipe FaceLandmarker from %s", MODEL_PATH)
+                self._state.set_camera_status("error", self._startup_error)
+                self._state.freeze_pointer("vision_error")
+                self._state.set_tracking(False, "vision_error", quality=0.0, faces=0)
+                self._telemetry.emit(
+                    "vision",
+                    "vision_model_load_failed",
+                    reason="model_load_failed",
+                    data={"model": str(MODEL_PATH), "error": self._startup_error},
+                )
+                return self.status()
             self._stop_event.clear()
             self._state.set_camera_status("starting")
             self._state.set_vision_availability(True, None)
@@ -223,6 +251,15 @@ class FaceTracker:
             self._thread = None
             self._release_capture()
             self._latest_jpeg = None
+            # Do not tear down a MediaPipe task while its worker is still
+            # executing inference. If it stopped cleanly, release the task so
+            # repeated start/stop cycles do not leak native worker resources.
+            if not (thread and thread.is_alive()) and self._landmarker is not None:
+                landmarker, self._landmarker = self._landmarker, None
+                try:
+                    landmarker.close()
+                except Exception:
+                    logger.exception("Failed to close MediaPipe FaceLandmarker")
         self._state.set_camera_status("stopped", "camera released by user request")
         self._state.set_tracking(False, "stopped", quality=0.0, faces=0)
         self._telemetry.emit("vision", "vision_stopped")
@@ -243,6 +280,8 @@ class FaceTracker:
                 "stream_clients": self._stream_clients,
                 "model": str(MODEL_PATH.name),
                 "synthetic_source": self._settings.camera_index == SYNTHETIC_CAMERA_INDEX,
+                "error": self._startup_error or self._camera_error,
+                "error_code": self._startup_error_code,
                 "calibration": {
                     "state": self._state.calibration_state,
                     "progress": round(self._state.calibration_progress, 3),
@@ -387,6 +426,8 @@ class FaceTracker:
                     "unavailable",
                     self._camera_error or "camera not available",
                 )
+                self._state.freeze_pointer("camera_unavailable")
+                self._state.set_tracking(False, "camera_unavailable", quality=0.0, faces=0)
                 if open_attempts == 1:
                     self._telemetry.emit(
                         "vision",
@@ -403,14 +444,30 @@ class FaceTracker:
                 continue
             try:
                 self._process_frame(frame)
-            except Exception as exc:  # keep the worker alive
+            except Exception as exc:
+                detail = f"{type(exc).__name__}: {exc}"
+                logger.exception("Vision frame processing failed")
+                self._startup_error_code = "inference_failed"
+                self._startup_error = detail
+                self._state.set_camera_status("error", detail)
+                self._state.freeze_pointer("vision_error")
+                self._state.set_tracking(False, "vision_error", quality=0.0, faces=0)
                 self._telemetry.emit(
                     "vision",
                     "frame_processing_error",
                     reason="frame_error",
-                    data={"error": f"{type(exc).__name__}: {exc}"},
+                    data={"error": detail, "model": str(MODEL_PATH)},
                 )
-                time.sleep(0.05)
+                with self._lock:
+                    failed_landmarker = self._landmarker
+                    self._landmarker = None
+                if failed_landmarker is not None:
+                    try:
+                        failed_landmarker.close()
+                    except Exception:
+                        logger.exception("Failed to release the failed MediaPipe task")
+                self._stop_event.set()
+                break
             with self._lock:
                 self._fps_window.append(time.monotonic())
             quality_samples += 1
@@ -503,6 +560,8 @@ class FaceTracker:
                 reason="camera_read_failed",
                 data={"detail": "frame read failed, reopening capture"},
             )
+            self._state.freeze_pointer("camera_lost")
+            self._state.set_tracking(False, "camera_lost", quality=0.0, faces=0)
             return None
         return frame
 

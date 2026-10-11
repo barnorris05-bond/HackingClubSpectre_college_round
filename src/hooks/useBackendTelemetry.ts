@@ -21,7 +21,7 @@ export interface UseBackendTelemetryReturn {
   pause: () => Promise<void>;
   resume: () => Promise<void>;
   emergencyStop: () => Promise<void>;
-  recover: () => Promise<void>;
+  recover: () => Promise<SessionState | null>;
   executeCommand: (transcript: string, execute?: boolean) => Promise<CommandResult | null>;
   refreshState: () => Promise<void>;
 }
@@ -197,8 +197,10 @@ export function useBackendTelemetry(): UseBackendTelemetryReturn {
       setSession(res.state);
       setBackendError(null);
       // Clearing emergency stop does not resume or arm cursor control.
+      return res.state;
     } catch (err: unknown) {
       setBackendError(err instanceof Error ? err.message : 'Failed to recover session');
+      return null;
     }
   }, []);
 
