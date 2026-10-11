@@ -1,0 +1,25 @@
+# Dependencies and environments
+node_modules/
+envlaya/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Browser caches and runtime profiles
+.browser-profile/
+.browser-profile*/
+test-profile/
+test-results/
+*.log
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# OS / Editor artifacts
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
