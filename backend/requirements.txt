@@ -1,0 +1,34 @@
+# Handsfree backend dependencies.
+# Pinned to the versions actually installed and tested in this environment
+# (Python 3.13.15, Windows 11). Transitive dependencies are resolved by pip.
+#
+# Install:
+#   .\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+#
+# After installing, fetch the MediaPipe face landmark model (see README.md):
+#   curl -L -o backend\app\vision\models\face_landmarker.task ^
+#     https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task
+
+# --- web framework ---
+fastapi==0.143.0
+uvicorn==0.54.0
+pydantic==2.14.0
+pydantic-settings==2.15.0
+python-dotenv==1.2.4
+websockets==17.2
+
+# --- vision pipeline (Pipeline A) ---
+numpy==2.5.3
+opencv-python==5.0.0.93
+mediapipe==1.1.0
+PyAutoGUI==0.9.54
+pillow==12.3.0
+
+# --- browser agent (Pipeline B) ---
+# Playwright drives the already-installed Edge or Chrome via channel="msedge"
+# or "chrome", so "playwright install" is not required.
+playwright==1.63.0
+
+# --- tests ---
+pytest==9.1.1
+httpx==0.28.1
