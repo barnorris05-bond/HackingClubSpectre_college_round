@@ -2,9 +2,10 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   backendApi,
   getWsUrl,
+  mapReadiness,
+  parseTelemetryPacket,
   type SessionState,
   type CommandResult,
-  type EventEnvelope,
   type ReadinessResponse,
 } from '../services/backendApi';
 
@@ -40,18 +41,33 @@ export function useBackendTelemetry(): UseBackendTelemetryReturn {
 
   const refreshState = useCallback(async () => {
     try {
-      const [sess, ready] = await Promise.all([
-        backendApi.getSession().catch(() => null),
-        backendApi.getReadiness().catch(() => null),
-      ]);
+      const [, sess] = await Promise.all([backendApi.getHealth(), backendApi.getSession()]);
       if (isMountedRef.current) {
-        if (sess) setSession(sess);
-        if (ready) setReadiness(ready);
+        setSession(sess);
+        setReadiness(mapReadiness(sess));
+        setBackendError(null);
+        if (sess.last_command_result) {
+          setLastCommandResult(sess.last_command_result);
+          setLastBlockedReason(sess.last_command_result.status === 'blocked'
+            ? sess.last_command_result.message
+            : null);
+        }
       }
-    } catch {
-      // Backend may be offline
+    } catch (err: unknown) {
+      if (isMountedRef.current) setBackendError(err instanceof Error ? err.message : 'Backend unavailable');
     }
   }, []);
+
+  const handleTelemetryEvent = useCallback((event: { kind?: string; message?: string }) => {
+    const kind = event.kind || '';
+    const message = event.message || '';
+    if (kind === 'safety' || kind === 'control' || kind === 'browser' || kind === 'voice' || kind === 'vision') {
+      // Backend events are {id, ts, kind, message, data}, not EventEnvelope.
+      // The status endpoint is authoritative for safety and last-command state.
+      refreshState();
+    }
+    if (kind === 'system' && message.includes('error')) setBackendError(message);
+  }, [refreshState]);
 
   const connectWebSocket = useCallback(() => {
     if (!isMountedRef.current) return;
@@ -78,31 +94,14 @@ export function useBackendTelemetry(): UseBackendTelemetryReturn {
       ws.onmessage = (event) => {
         if (!isMountedRef.current) return;
         try {
-          const envelope: EventEnvelope = JSON.parse(event.data);
-          const { type, data } = envelope;
-
-          if (type === 'session.state' && data?.state) {
-            // Authoritative full session snapshot
-            setSession(data.state as SessionState);
-          } else if (type === 'session.paused' || type === 'session.resumed' || type === 'session.emergency_stop') {
-            // Partial state events - refresh full session to avoid stale state
-            refreshState();
-          } else if (type === 'command.completed') {
-            const result = data as unknown as CommandResult;
-            setLastCommandResult(result);
-            setLastBlockedReason(null);
-          } else if (type === 'command.blocked') {
-            const result = data as unknown as CommandResult;
-            setLastCommandResult(result);
-            setLastBlockedReason(result.message || result.reason_code || 'Action blocked by safety policy');
-          } else if (type === 'command.failed') {
-            const result = data as unknown as CommandResult;
-            setLastCommandResult(result);
-          } else if (type === 'command.processing') {
-            const result = data as unknown as CommandResult;
-            setLastCommandResult(result);
-          } else if (type === 'system.error') {
-            setBackendError(String(data?.message || 'Backend system error'));
+          const packet = parseTelemetryPacket(JSON.parse(event.data));
+          if (!packet) return;
+          if (packet.type === 'history') {
+            // The backend sends recent raw telemetry here. Initial status was
+            // already fetched on socket open; parsing the history is sufficient.
+            void packet.events.length;
+          } else {
+            handleTelemetryEvent(packet.event);
           }
         } catch {
           // Non-JSON or malformed packet
@@ -133,7 +132,7 @@ export function useBackendTelemetry(): UseBackendTelemetryReturn {
         if (isMountedRef.current) connectWebSocket();
       }, 3000);
     }
-  }, [refreshState]);
+  }, [handleTelemetryEvent, refreshState]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -164,7 +163,7 @@ export function useBackendTelemetry(): UseBackendTelemetryReturn {
 
   const pause = useCallback(async () => {
     try {
-      const res = await backendApi.pauseSession();
+      const res = await backendApi.pauseSession(true);
       setSession(res.state);
       setBackendError(null);
     } catch (err: unknown) {
@@ -197,15 +196,28 @@ export function useBackendTelemetry(): UseBackendTelemetryReturn {
       const res = await backendApi.recoverSession();
       setSession(res.state);
       setBackendError(null);
-      setLastBlockedReason(null);
+      // Clearing emergency stop does not resume or arm cursor control.
     } catch (err: unknown) {
       setBackendError(err instanceof Error ? err.message : 'Failed to recover session');
     }
   }, []);
 
   const executeCommand = useCallback(async (transcript: string, execute = true): Promise<CommandResult | null> => {
+    if (!execute) {
+      const result: CommandResult = {
+        command_id: `voice-not-executed-${Date.now()}`,
+        kind: 'unknown',
+        status: 'failed',
+        message: 'The backend does not expose a non-executing voice command endpoint.',
+        reason_code: 'execution_not_supported',
+        details: { transcript },
+      };
+      setLastCommandResult(result);
+      setBackendError(result.message);
+      return result;
+    }
     try {
-      const result = await backendApi.sendVoiceCommand(transcript, execute);
+      const result = await backendApi.sendVoiceCommand(transcript);
       setLastCommandResult(result);
       if (result.status === 'blocked') {
         setLastBlockedReason(result.message || result.reason_code || 'Action blocked by safety policy');
